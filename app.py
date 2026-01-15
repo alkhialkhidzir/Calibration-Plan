@@ -9,7 +9,7 @@ import base64
 st.set_page_config(page_title="Calibration Dashboard", layout="wide")
 
 USERNAME = "admin"
-PASSWORD_HASH = b'$2b$12$pcIlEN.rBmQoi.QfivBOVujlP2NxwdQa/SnJ2arDsMAacJA9j7whK'
+PASSWORD_HASH = b'$2b$12$HXee/mzZK3D1Nr5CknpV4.tMKt6NzUnw9UXKugdB7NukbmAIL3sIu'
 
 def check_login(user, pwd):
     return (
