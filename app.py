@@ -3,8 +3,111 @@ import pandas as pd
 from io import BytesIO
 from datetime import datetime
 import calendar
+import bcrypt
+import base64
 
-st.set_page_config(page_title="Dashboard Kalibrasi", layout="wide")
+st.set_page_config(page_title="Calibration Dashboard", layout="wide")
+
+USERNAME = "admin"
+PASSWORD_HASH = b"$2b$12$ojKsHiYQie/NWSr1v2JIU.kQSdS.vp/dENxAsYsRzw9rbQp9FhQNa"
+
+def check_login(user, pwd):
+    return (
+        user == USERNAME
+        and bcrypt.checkpw(pwd.encode(), PASSWORD_HASH)
+    )
+
+# ===== SESSION =====
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+# ===== LOGIN PAGE =====
+if not st.session_state.logged_in:
+
+    def load_logo_base64(path):
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+
+    logo_base64 = load_logo_base64("garudafood_logo.png")
+
+    st.markdown("""
+    <style>
+        #MainMenu, footer, header {visibility: hidden;}
+
+        body {
+            background-color: #f3f4f6;
+        }
+
+        .login-box {
+            background-color: #ffffff;
+            padding: 40px 35px 35px 35px;
+            border-radius: 14px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+            border: 1px solid #e5e7eb;
+        }
+
+        .stTextInput > div > div > input {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .stButton > button {
+            background-color: #1E88E5;
+            color: white;
+            font-weight: 600;
+            border-radius: 8px;
+            padding: 10px;
+            border: none;
+            width: 100%;
+        }
+
+        .stButton > button:hover {
+            background-color: #1565C0;
+        }
+
+        .block-container {
+            padding-top: 5rem;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col_left, col_center, col_right = st.columns([3, 2, 3])
+
+    with col_center:
+        st.markdown(f"""
+        <div style="text-align:center;">
+            <img src="data:image/png;base64,{logo_base64}" width="120" />
+            <h2 style="margin-bottom: 5px;">Login</h2>
+            <p style="margin-bottom: 30px; color: #6b7280; font-size: 14px;">
+                Calibration Dashboard
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        username = st.text_input(
+            "Username",
+            placeholder="Username",
+            label_visibility="collapsed"
+        )
+
+        password = st.text_input(
+            "Password",
+            type="password",
+            placeholder="Password",
+            label_visibility="collapsed"
+        )
+
+        if st.button("Sign In", use_container_width=True):
+            if check_login(username, password):
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("❌ Username atau password salah")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
 
 st.markdown("""
 <style>
@@ -94,10 +197,9 @@ div[data-testid="metric-container"] {
 </style>
 """, unsafe_allow_html=True)
 
-
 # ====== Fungsi Utility ======
 def load_excel(file):
-    """Load semua sheet dari Excel file"""
+    """Load All sheet dari Excel file"""
     xls = pd.ExcelFile(file)
     data = {}
     for sheet in xls.sheet_names:
@@ -129,9 +231,9 @@ def filter_by_month_year(df, bulan=None, tahun=None):
         df_filtered['BULAN'] = df_filtered['TANGGAL PLAN'].apply(get_month_name)
         df_filtered['TAHUN'] = df_filtered['TANGGAL PLAN'].apply(get_year)
         
-        if bulan and bulan != 'SEMUA':
+        if bulan and bulan != 'All':
             df_filtered = df_filtered[df_filtered['BULAN'] == bulan]
-        if tahun and tahun != 'SEMUA':
+        if tahun and tahun != 'All':
             df_filtered = df_filtered[df_filtered['TAHUN'] == tahun]
         
         # Drop kolom temporary
@@ -145,24 +247,24 @@ def update_status(row):
     exp = row['TANGGAL EXP']
     
     if pd.isna(real) or real == '' or real == '-':
-        return "⏳ Belum"
+        return " Not Yet"
     
     try:
         real_date = pd.to_datetime(real)
         exp_date = pd.to_datetime(exp)
         
         if real_date <= exp_date:
-            return "✅ Tepat Waktu"
+            return " On Time"
         else:
-            return "⚠️ Terlambat"
+            return " Late"
     except:
-        return "⏳ Belum"
+        return " Not Yet"
 
 def color_status_row(row):
     """Styling untuk baris berdasarkan status"""
-    if row['STATUS'] == "✅ Tepat Waktu":
+    if row['STATUS'] == " On Time":
         return ['background-color: #d4edda'] * len(row)
-    elif row['STATUS'] == "⚠️ Terlambat":
+    elif row['STATUS'] == " Late":
         return ['background-color: #f8d7da'] * len(row)
     else:
         return ['background-color: #fff3cd'] * len(row)
@@ -177,33 +279,33 @@ if 'current_data' not in st.session_state:
 with st.sidebar:
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        st.image("garudafood_logo.png", width=220)
+        st.image("garudafood_logo.png", width=240)
 
-    uploaded_file = st.file_uploader("📁 Upload File Excel", type=["xlsx", "xls"])
+    uploaded_file = st.file_uploader(" Upload File Excel", type=["xlsx", "xls"])
     
     if uploaded_file:
         # Load data saat pertama kali upload
         if st.session_state.data_dict is None:
             st.session_state.data_dict = load_excel(uploaded_file)
-            st.success("✅ File berhasil diupload!")
+            st.success("✅ File uploaded successfully")
         
         data_dict = st.session_state.data_dict
         
         # Filter
-        st.subheader("Filter Data")
-        sheet_name = st.selectbox("Jenis Mesin", list(data_dict.keys()))
+        st.subheader("Data Filter")
+        sheet_name = st.selectbox("Machine Type", list(data_dict.keys()))
         
         # Get unique years and months dari TANGGAL PLAN
         df_original = data_dict[sheet_name].copy()
         df_original['TEMP_MONTH'] = df_original['TANGGAL PLAN'].apply(get_month_name)
         df_original['TEMP_YEAR'] = df_original['TANGGAL PLAN'].apply(get_year)
         
-        available_years = ['SEMUA'] + sorted(df_original['TEMP_YEAR'].dropna().unique().tolist())
-        available_months = ['SEMUA'] + sorted(df_original['TEMP_MONTH'].dropna().unique().tolist(), 
+        available_years = ['All'] + sorted(df_original['TEMP_YEAR'].dropna().unique().tolist())
+        available_months = ['All'] + sorted(df_original['TEMP_MONTH'].dropna().unique().tolist(), 
                                                key=lambda x: list(calendar.month_name).index(x.title()) if x.title() in calendar.month_name else 0)
         
-        tahun = st.selectbox("Tahun", available_years)
-        bulan = st.selectbox("Bulan", available_months)
+        tahun = st.selectbox("Year", available_years)
+        bulan = st.selectbox("Month", available_months)
 
 # ====== Main Content ======
 if uploaded_file and st.session_state.data_dict:
@@ -217,8 +319,8 @@ if uploaded_file and st.session_state.data_dict:
 
     # Apply filters
     df_filtered = filter_by_month_year(df, 
-                                        bulan if bulan != 'SEMUA' else None,
-                                        tahun if tahun != 'SEMUA' else None)
+                                        bulan if bulan != 'All' else None,
+                                        tahun if tahun != 'All' else None)
     
     
     # Hitung status
@@ -227,15 +329,15 @@ if uploaded_file and st.session_state.data_dict:
     # Header dengan metrics
     st.markdown(f"""
     <div class="hero">
-        <h1>Dashboard Kalibrasi</h1>
+        <h1>Calibration Dashboard</h1>
         <p>Monitoring • Performance • Compliance</p>
     </div>
     """, unsafe_allow_html=True)
     
     filter_info = []
-    if tahun != 'SEMUA':
+    if tahun != 'All':
         filter_info.append(f"Tahun: {tahun}")
-    if bulan != 'SEMUA':
+    if bulan != 'All':
         filter_info.append(f"Bulan: {bulan}")
     
     if filter_info:
@@ -248,31 +350,30 @@ if uploaded_file and st.session_state.data_dict:
     
     total_mesin = len(df_filtered)
     status_counts = df_filtered['STATUS'].value_counts()
-    tepat = status_counts.get('✅ Tepat Waktu', 0)
-    terlambat = status_counts.get('⚠️ Terlambat', 0)
-    belum = status_counts.get('⏳ Belum', 0)
+    tepat = status_counts.get(' On Time', 0)
+    Late = status_counts.get(' Late', 0)
+    belum = status_counts.get(' Not Yet', 0)
     
     with col1:
-        st.metric("📊 Plan kalibrasi", total_mesin)
+        st.metric(" Calibration Plan", total_mesin)
     with col2:
         persen_tepat = f"{tepat/total_mesin*100:.1f}%" if total_mesin > 0 else "0%"
-        st.metric("✅ Tepat Waktu", tepat, delta=persen_tepat)
+        st.metric(" On Time", tepat, delta=persen_tepat)
     with col3:
-        persen_terlambat = f"{terlambat/total_mesin*100:.1f}%" if total_mesin > 0 else "0%"
-        st.metric("⚠️ Terlambat", terlambat, delta=persen_terlambat, delta_color="inverse")
+        persen_Late = f"{Late/total_mesin*100:.1f}%" if total_mesin > 0 else "0%"
+        st.metric(" Late", Late, delta=persen_Late, delta_color="inverse")
     with col4:
         persen_belum = f"{belum/total_mesin*100:.1f}%" if total_mesin > 0 else "0%"
-        st.metric("⏳ Belum", belum, delta=persen_belum)
+        st.metric(" Not Yet", belum, delta=persen_belum)
     
     st.markdown("---")
 
     
     # Tampilkan data
-    # st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("📋 Data Jadwal Kalibrasi")
+    st.subheader(" Calibration Schedule")
     
-    # Sortir berdasarkan status (Terlambat > Belum > Tepat Waktu)
-    status_order = {"⚠️ Terlambat": 0, "⏳ Belum": 1, "✅ Tepat Waktu": 2}
+    # Sortir berdasarkan status (Late > Belum > On Time)
+    status_order = {" Late": 0, " Not Yet": 1, " On Time": 2}
     df_filtered['SORT_ORDER'] = df_filtered['STATUS'].map(status_order)
     df_filtered = df_filtered.sort_values('SORT_ORDER').drop('SORT_ORDER', axis=1)
     
@@ -288,15 +389,21 @@ if uploaded_file and st.session_state.data_dict:
     
     # Rename NO_URUT jadi NO
     df_filtered = df_filtered.rename(columns={'NO_URUT': 'NO'})
+
+    date_cols = ['TANGGAL PLAN', 'TANGGAL EXP', 'TANGGAL REALISASI']
     
+    for col in date_cols:
+        if col in df_filtered.columns:
+            df_filtered[col] = pd.to_datetime(df_filtered[col], errors='coerce') \
+                .dt.strftime('%d-%m-%Y')
+
     # Styling
     styled_df = df_filtered.style.apply(color_status_row, axis=1)
     st.dataframe(styled_df, use_container_width=True, height=500, hide_index=True)
-    
-    st.markdown("---")
+
 
     # Form input realisasi
-    st.subheader("Input Tanggal Realisasi")
+    st.subheader(" Realization Date")
     
     with st.form("update_form"):
         col_form1, col_form2, col_form3 = st.columns([3, 2, 1])
@@ -343,22 +450,22 @@ if uploaded_file and st.session_state.data_dict:
         group_col = 'PLANT'
     
     if group_col in df_filtered.columns:
-        st.subheader(f"Detail per Plant")
+        st.subheader(f"Details per Plant")
         
         summary = df_filtered.groupby(group_col).agg({
             'NO': 'count',
-            'STATUS': lambda x: (x == '✅ Tepat Waktu').sum()
-        }).rename(columns={'NO': 'Total', 'STATUS': 'Tepat Waktu'})
+            'STATUS': lambda x: (x == ' On Time').sum()
+        }).rename(columns={'NO': 'Total', 'STATUS': 'On Time'})
         
-        summary['Belum/Terlambat'] = summary['Total'] - summary['Tepat Waktu']
-        summary['% Selesai'] = (summary['Tepat Waktu'] / summary['Total'] * 100).round(1)
+        summary['Not Yet/Late'] = summary['Total'] - summary['On Time']
+        summary['% Selesai'] = (summary['On Time'] / summary['Total'] * 100).round(1)
         
         st.dataframe(summary, use_container_width=True)
     
     st.markdown("---")
     
     # Download section
-    st.subheader("Simpan Data Terbaru")
+    st.subheader("Save New Data")
     
     col_btn = st.columns(1)[0]
     
@@ -386,11 +493,11 @@ else:
     # ====== WELCOME SCREEN ======
     st.markdown("""
     <div class="hero">
-        <h1>Dashboard Kalibrasi Mesin</h1>
+        <h1>Calibration Dashboard</h1>
         <p>Monitoring • Performance • Compliance</p>
         <br>
         <p style="font-size:18px;">
-            👈 Silakan upload file Excel untuk memulai
+            👈 Please upload the excel file to start
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -398,6 +505,6 @@ else:
 # ====== FOOTER ======
 st.markdown("---")
 st.caption(
-    "<p style='text-align: center;'>Dashboard Jadwal Kalibrasi GarudaFood © 2026</p>",
+    "<p style='text-align: center;'>Calibration Dashboard  GarudaFood © 2026</p>",
     unsafe_allow_html=True
 )
